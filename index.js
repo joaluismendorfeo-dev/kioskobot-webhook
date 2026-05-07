@@ -5,7 +5,7 @@ const VERIFY_TOKEN = 'kioskobot2026';
 const server = http.createServer((req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
-    if ([req.me](https://req.me)thod === 'GET') {
+    if (req.method === 'GET') {
       const mode = url.searchParams.get('hub.mode');
       const token = url.searchParams.get('hub.verify_token');
       const challenge = url.searchParams.get('hub.challenge');
