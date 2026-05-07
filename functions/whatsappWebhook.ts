@@ -1,6 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-
-const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN') || 'kioskobot2026';
+const VERIFY_TOKEN = 'kioskobot2026';
 
 Deno.serve(async (req) => {
   // Verificación del webhook (GET request de Meta)
@@ -10,14 +8,17 @@ Deno.serve(async (req) => {
     const token = url.searchParams.get('hub.verify_token');
     const challenge = url.searchParams.get('hub.challenge');
 
-    console.log(`Verificación: mode=${mode}, token=${token}, challenge=${challenge}`);
+    console.log(`Verificación recibida: mode=${mode}, token=${token}, challenge=${challenge}`);
 
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
       console.log('Webhook verificado correctamente');
-      return new Response(challenge, { status: 200 });
+      return new Response(challenge, { 
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' }
+      });
     } else {
-      console.log(`Token incorrecto: recibido="${token}", esperado="${VERIFY_TOKEN}"`);
-      return new Response('Token inválido', { status: 403 });
+      console.log(`Token incorrecto. Recibido: "${token}", Esperado: "${VERIFY_TOKEN}"`);
+      return new Response('Forbidden', { status: 403 });
     }
   }
 
@@ -46,5 +47,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response('Método no permitido', { status: 405 });
+  return new Response('Method Not Allowed', { status: 405 });
 });
