@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN') || '';
+const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN') || 'kioskobot2026';
 
 Deno.serve(async (req) => {
   // Verificación del webhook (GET request de Meta)
@@ -10,10 +10,13 @@ Deno.serve(async (req) => {
     const token = url.searchParams.get('hub.verify_token');
     const challenge = url.searchParams.get('hub.challenge');
 
+    console.log(`Verificación: mode=${mode}, token=${token}, challenge=${challenge}`);
+
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
       console.log('Webhook verificado correctamente');
       return new Response(challenge, { status: 200 });
     } else {
+      console.log(`Token incorrecto: recibido="${token}", esperado="${VERIFY_TOKEN}"`);
       return new Response('Token inválido', { status: 403 });
     }
   }
@@ -31,15 +34,9 @@ Deno.serve(async (req) => {
 
       if (messages && messages.length > 0) {
         const message = messages[0];
-        const from = message.from; // número del cliente
+        const from = message.from;
         const text = message.text?.body || '';
-        const messageId = message.id;
-        const timestamp = message.timestamp;
-
         console.log(`Mensaje de ${from}: ${text}`);
-
-        // Aquí en el futuro se procesará el mensaje con IA y se responderá
-        // Por ahora solo registramos el mensaje
       }
 
       return new Response('OK', { status: 200 });
