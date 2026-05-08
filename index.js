@@ -4,34 +4,34 @@ const app = express();
 app.use(express.json());
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const PHONE_NUMBER_ID = '1157127870810904';
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID || '100013995383645';
 const VERIFY_TOKEN = 'kioskobot2026';
 const MERCADOPAGO_ALIAS = 'fa24encasa';
 const MIN_ORDER = 30000;
+const SHIPPING_COST = 2000;
 
-// URL de la función que sirve los combos dinámicamente
-const COMBOS_API_URL = 'https://69f3622c3117e7478384228e.base44.app/api/functions/getCombos';
+// ─── COMBOS ───────────────────────────────────────────────────────────────────
+// Para actualizar combos, avisale al agente y los cambia en segundos.
 
-// Cache de combos (se refresca cada 10 minutos)
-let combosCache = [];
-let combosCacheTime = 0;
+const COMBOS = [
+  { id: 'combo001', emoji: '🎬', name: 'Combo Cine en Casa', price: 30000,
+    description: '1 Gaseosa 500ml\n2 Snack Quento 90g\n2 Chocolates Cofler 55gr\n2 Gomitas Yummy 30gr' },
+  { id: 'combo002', emoji: '📺', name: 'Combo Maratón Series', price: 30000,
+    description: '1 Gaseosa 1500ml\n2 Snack Quento 90g\n2 Chocolates Cofler Air 55gr\n20 Caramelos ButterToffi' },
+  { id: 'combo003', emoji: '🚬', name: 'Combo Fumador Ansioso', price: 30000,
+    description: '1 Marlboro Box\n1 Encendedor Bic Maxi\n1 Snack Quento 90g\n1 Chocolate Milka 55g\n2 Alfajores Triple Arcor' },
+  { id: 'combo004', emoji: '🍫', name: 'Combo Bajón Sweet/Salad', price: 30000,
+    description: '1 Chocolate Cofler Block 110gr\n1 Kesitas 125gr\n1 Rex 125gr\n1 Coca Cola 500ml\n2 Gomitas Yummy 30gr' },
+  { id: 'combo005', emoji: '🎉', name: 'Combo Previa', price: 30000,
+    description: '2 Coca Cola 1500ml\n2 Cepita Naranja 1lt\n1 Hielo 3kg\n4 Gomitas Yummy 30gr' },
+  { id: 'combo006', emoji: '🧉', name: 'Combo Matero', price: 30000,
+    description: '1 Yerba Amanda 500gr\n1 Azúcar 1kg\n1 Surtido Diversión 390gr\n30 Caramelos Butter Toffie\n2 Alfajores Triple Arcor\n2 Don Satur' },
+  { id: 'combo007', emoji: '🛡️', name: 'Combo Safe', price: 30000,
+    description: '2 Prime\n2 Monster\n1 Beldent\n1 Halls' },
+];
 
-async function getCombos() {
-  const now = Date.now();
-  if (combosCache.length > 0 && now - combosCacheTime < 10 * 60 * 1000) {
-    return combosCache;
-  }
-  try {
-    const res = await axios.get(COMBOS_API_URL, { timeout: 5000 });
-    if (res.data?.ok && res.data?.data?.length > 0) {
-      combosCache = res.data.data;
-      combosCacheTime = now;
-      console.log(`✅ Combos actualizados: ${combosCache.length}`);
-    }
-  } catch (err) {
-    console.error('Error cargando combos:', err.message);
-  }
-  return combosCache;
+function getCombos() {
+  return COMBOS;
 }
 
 // ─── CATÁLOGO ─────────────────────────────────────────────────────────────────
@@ -230,17 +230,19 @@ async function handleCombosOCatalogo(phone, session, msg) {
 }
 
 async function sendCombos(phone) {
-  const combos = await getCombos();
-  if (combos.length === 0) {
-    await sendMessage(phone, '😕 No hay combos disponibles en este momento. Escribí *2* para ver el catálogo completo.');
-    return;
-  }
-  const lista = combos.map((c, i) =>
+  const combos = COMBOS;
+  // Mandamos los combos en dos mensajes para evitar límite de tamaño
+  const mitad = Math.ceil(combos.length / 2);
+  const parte1 = combos.slice(0, mitad).map((c, i) =>
     `*${i + 1}.* ${c.emoji || '🔥'} *${c.name}*\n${c.description}\n💰 *${formatPrice(c.price)} — ENVÍO GRATIS* 🚚`
   ).join('\n\n');
+  const parte2 = combos.slice(mitad).map((c, i) =>
+    `*${mitad + i + 1}.* ${c.emoji || '🔥'} *${c.name}*\n${c.description}\n💰 *${formatPrice(c.price)} — ENVÍO GRATIS* 🚚`
+  ).join('\n\n');
 
+  await sendMessage(phone, `🔥 *COMBOS DE LANZAMIENTO FA24* 🔥\n\n${parte1}`);
   await sendMessage(phone,
-    `🔥 *COMBOS DE LANZAMIENTO FA24* 🔥\n\n${lista}\n\n` +
+    `${parte2}\n\n` +
     `─────────────────\n` +
     `Respondé con el *número del combo* para agregarlo.\n` +
     `Escribí *cat* para ir al catálogo completo.\n` +
@@ -253,7 +255,7 @@ async function handleViendoCombos(phone, session, msg) {
     session.step = 'menu_principal';
     return sendMenuPrincipal(phone);
   }
-  const combos = await getCombos();
+  const combos = COMBOS;
   const idx = parseInt(msg) - 1;
   if (isNaN(idx) || idx < 0 || idx >= combos.length) {
     await sendMessage(phone, `❓ Respondé con un número del 1 al ${combos.length}, o escribí *cat* para ver el catálogo.`);
@@ -436,11 +438,16 @@ async function handleEsperandoDireccion(phone, session, text) {
   session.step = 'confirmando_pedido';
   const total = getCartTotal(session.cart);
 
+  const shipping = total >= MIN_ORDER ? 0 : SHIPPING_COST;
+  const totalFinal = total + shipping;
+  const shippingText = shipping === 0 ? '🚚 *Envío: GRATIS* ✅' : `🚚 *Envío: ${formatPrice(shipping)}*`;
+
   await sendMessage(phone,
     `📝 *Resumen del pedido:*\n\n` +
     `${cartSummary(session.cart)}\n\n` +
-    `💰 *Total: ${formatPrice(total)}*\n` +
-    `🚚 *Envío: GRATIS* ✅\n\n` +
+    `💰 Subtotal: ${formatPrice(total)}\n` +
+    `${shippingText}\n` +
+    `💵 *TOTAL: ${formatPrice(totalFinal)}*\n\n` +
     `👤 ${session.name}\n` +
     `📍 ${session.address}\n\n` +
     `✅ Escribí *sí* para confirmar\n❌ Escribí *no* para cancelar`
@@ -459,13 +466,17 @@ async function handleConfirmandoPedido(phone, session, msg) {
 
 async function confirmarPedido(phone, session) {
   const total = getCartTotal(session.cart);
+  const shipping = total >= MIN_ORDER ? 0 : SHIPPING_COST;
+  const totalFinal = total + shipping;
   const orderNum = Date.now().toString().slice(-6);
+  const shippingText = shipping === 0 ? '🚚 *Envío: GRATIS* ✅' : `🚚 *Envío: ${formatPrice(shipping)}*`;
 
   await sendMessage(phone,
     `🎉 *¡Pedido confirmado!* #${orderNum}\n\n` +
     `${cartSummary(session.cart)}\n\n` +
-    `💰 *Total: ${formatPrice(total)}*\n` +
-    `🚚 *Envío: GRATIS* ✅\n\n` +
+    `💰 Subtotal: ${formatPrice(total)}\n` +
+    `${shippingText}\n` +
+    `💵 *TOTAL A PAGAR: ${formatPrice(totalFinal)}*\n\n` +
     `📍 Entrega en: ${session.address}\n\n` +
     `💳 *Pagá con MercadoPago:*\n` +
     `Alias: *${MERCADOPAGO_ALIAS}*\n\n` +
@@ -505,3 +516,4 @@ app.listen(PORT, () => {
   console.log(`🤖 KioskoBot corriendo en puerto ${PORT}`);
   getCombos(); // precarga combos al iniciar
 });
+// redeploy Fri May  8 05:34:45 UTC 2026
