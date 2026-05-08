@@ -10,11 +10,11 @@
     "price": {
       "type": "number"
     },
-    "active": {
-      "type": "boolean"
-    },
     "emoji": {
       "type": "string"
+    },
+    "active": {
+      "type": "boolean"
     }
   },
   "required": [],
