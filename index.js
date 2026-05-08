@@ -6,11 +6,64 @@ app.use(express.json());
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = '1157127870810904';
 const VERIFY_TOKEN = 'kioskobot2026';
-const BASE44_SUPERAGENT_URL = process.env.BASE44_SUPERAGENT_URL; // URL para crear pedidos
 const MERCADOPAGO_ALIAS = 'fa24encasa';
 const MIN_ORDER = 30000;
 
-// ─── DATOS DEL CATÁLOGO (sincronizados desde QuickOrder AI) ───────────────────
+// ─── COMBOS DE LANZAMIENTO ───────────────────────────────────────────────────
+
+const COMBOS = [
+  {
+    id: 'combo001',
+    name: '🎬 Combo Cine en Casa',
+    price: 30000,
+    description:
+      '• 1 Gaseosa 500ml\n• 2 Snack Quento 90g\n• 2 Chocolates Cofler 55gr\n• 2 Gomitas Yummy 30gr',
+  },
+  {
+    id: 'combo002',
+    name: '📺 Combo Maratón Series',
+    price: 30000,
+    description:
+      '• 1 Gaseosa 1500ml\n• 2 Snack Quento 90g\n• 2 Chocolates Cofler Air 55gr\n• 20 Caramelos ButterToffi',
+  },
+  {
+    id: 'combo003',
+    name: '🚬 Combo Fumador Ansioso',
+    price: 30000,
+    description:
+      '• 1 Marlboro Box\n• 1 Encendedor Bic Maxi\n• 1 Snack Quento 90g\n• 1 Chocolate Milka 55g\n• 2 Alfajores Triple Arcor',
+  },
+  {
+    id: 'combo004',
+    name: '🍫 Combo Bajón Sweet/Salad',
+    price: 30000,
+    description:
+      '• 1 Chocolate Cofler Block 110gr\n• 1 Kesitas 125gr\n• 1 Rex 125gr\n• 1 Coca Cola 500ml\n• 2 Gomitas Yummy 30gr',
+  },
+  {
+    id: 'combo005',
+    name: '🎉 Combo Previa',
+    price: 30000,
+    description:
+      '• 2 Coca Cola 1500ml\n• 2 Cepita Naranja 1lt\n• 1 Hielo 3kg\n• 4 Gomitas Yummy 30gr',
+  },
+  {
+    id: 'combo006',
+    name: '🧉 Combo Matero',
+    price: 30000,
+    description:
+      '• 1 Yerba Amanda 500gr\n• 1 Azúcar 1kg\n• 1 Surtido Diversión 390gr\n• 30 Caramelos Butter Toffie\n• 2 Alfajores Triple Arcor\n• 2 Don Satur',
+  },
+  {
+    id: 'combo007',
+    name: '🛡️ Combo Safe',
+    price: 30000,
+    description:
+      '• 2 Prime\n• 2 Monster\n• 1 Beldent\n• 1 Halls',
+  },
+];
+
+// ─── CATÁLOGO ─────────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
   { id: '69f000469cc4196e1b93ea27', name: 'Bebidas', emoji: '🥤', order: 1 },
@@ -22,7 +75,6 @@ const CATEGORIES = [
 ];
 
 const PRODUCTS = {
-  // BEBIDAS
   '69f000469cc4196e1b93ea27': [
     { id: 'beb001', name: 'Coca Cola Lata 473ML', price: 3200 },
     { id: 'beb002', name: 'Monster Mango 473ML', price: 5200 },
@@ -40,7 +92,6 @@ const PRODUCTS = {
     { id: 'beb014', name: 'Aquarius 1500ML Pera', price: 3800 },
     { id: 'beb015', name: 'Aquarius 1500ML Uva', price: 3800 },
   ],
-  // GOLOSINAS
   '69f000469cc4196e1b93ea28': [
     { id: 'gol001', name: 'Alfajor Fantoche Pescado Raul Negro', price: 1100 },
     { id: 'gol002', name: 'Alfajor Fantoche Pescado Raul Blanco', price: 1100 },
@@ -61,7 +112,6 @@ const PRODUCTS = {
     { id: 'gol017', name: 'Alfajor Milka Pepitos Triple', price: 2800 },
     { id: 'gol018', name: 'Alfajor MILKA SHOT Triple', price: 2800 },
   ],
-  // SNACK QUENTO
   '69f0e4ef4de5adae291d0409': [
     { id: 'snk001', name: 'Papas Clasicas 92g', price: 3900 },
     { id: 'snk002', name: 'Papas Onduladas 92g', price: 3900 },
@@ -84,21 +134,18 @@ const PRODUCTS = {
     { id: 'snk019', name: 'Palitos Panceta 85g', price: 3200 },
     { id: 'snk020', name: 'Palitos Queso 85g', price: 3200 },
   ],
-  // ALMACÉN
   '69f000469cc4196e1b93ea2a': [
     { id: 'alm001', name: 'Galletitas Vocación x200g', price: 2500 },
     { id: 'alm002', name: 'Galletitas Oreo x119g', price: 2800 },
     { id: 'alm003', name: 'Maní Con Chocolate', price: 1800 },
     { id: 'alm004', name: 'Chicle Beldent x10u', price: 1200 },
   ],
-  // CIGARRILLOS
   '69f000469cc4196e1b93ea2b': [
     { id: 'cig001', name: 'Marlboro Rojo x20', price: 4500 },
     { id: 'cig002', name: 'Marlboro Gold x20', price: 4500 },
     { id: 'cig003', name: 'Lucky Strike x20', price: 4200 },
     { id: 'cig004', name: 'Parliament x20', price: 5000 },
   ],
-  // ARTÍCULOS DE LIMPIEZA
   '69f000469cc4196e1b93ea2c': [
     { id: 'lim001', name: 'Lavandina 1L', price: 1800 },
     { id: 'lim002', name: 'Detergente 500ML', price: 2200 },
@@ -108,29 +155,17 @@ const PRODUCTS = {
 
 // ─── SESIONES ─────────────────────────────────────────────────────────────────
 
-const sessions = {}; // key: phoneNumber
+const sessions = {};
 
 function getSession(phone) {
   if (!sessions[phone]) {
-    sessions[phone] = {
-      step: 'inicio',
-      cart: [],
-      name: null,
-      address: null,
-      currentCategory: null,
-    };
+    sessions[phone] = { step: 'inicio', cart: [], name: null, address: null, currentCategory: null };
   }
   return sessions[phone];
 }
 
 function resetSession(phone) {
-  sessions[phone] = {
-    step: 'inicio',
-    cart: [],
-    name: null,
-    address: null,
-    currentCategory: null,
-  };
+  sessions[phone] = { step: 'inicio', cart: [], name: null, address: null, currentCategory: null };
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -152,12 +187,7 @@ async function sendMessage(to, text) {
   try {
     await axios.post(
       `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        to,
-        type: 'text',
-        text: { body: text },
-      },
+      { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } },
       { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } }
     );
   } catch (err) {
@@ -171,79 +201,147 @@ async function handleMessage(phone, text) {
   const session = getSession(phone);
   const msg = text.trim().toLowerCase();
 
-  // Comando universal de reinicio
   if (['reiniciar', 'inicio', 'hola', 'menu', 'menú', '0'].includes(msg)) {
     resetSession(phone);
     return sendWelcome(phone);
   }
 
   switch (session.step) {
-    case 'inicio':
-      return sendWelcome(phone);
-
-    case 'menu_principal':
-      return handleMenuPrincipal(phone, session, msg);
-
-    case 'seleccionando_categoria':
-      return handleSeleccionandoCategoria(phone, session, msg);
-
-    case 'seleccionando_producto':
-      return handleSeleccionandoProducto(phone, session, msg);
-
-    case 'esperando_nombre':
-      return handleEsperandoNombre(phone, session, text);
-
-    case 'esperando_direccion':
-      return handleEsperandoDireccion(phone, session, text);
-
-    case 'confirmando_pedido':
-      return handleConfirmandoPedido(phone, session, msg);
-
+    case 'inicio':             return sendWelcome(phone);
+    case 'combos_o_catalogo':  return handleCombosOCatalogo(phone, session, msg);
+    case 'viendo_combos':      return handleViendoCombos(phone, session, msg);
+    case 'menu_principal':     return handleMenuPrincipal(phone, session, msg);
+    case 'seleccionando_categoria': return handleSeleccionandoCategoria(phone, session, msg);
+    case 'seleccionando_producto':  return handleSeleccionandoProducto(phone, session, msg);
+    case 'esperando_nombre':   return handleEsperandoNombre(phone, session, text);
+    case 'esperando_direccion': return handleEsperandoDireccion(phone, session, text);
+    case 'confirmando_pedido': return handleConfirmandoPedido(phone, session, msg);
     default:
       resetSession(phone);
       return sendWelcome(phone);
   }
 }
 
+// ── BIENVENIDA con combos proactivos ─────────────────────────────────────────
+
 async function sendWelcome(phone) {
   const session = getSession(phone);
+  session.step = 'combos_o_catalogo';
+
+  await sendMessage(phone,
+    `¡Hola! 👋 Bienvenido al delivery de *FA24* 🏪\n\n` +
+    `🔥 *¡COMBOS DE LANZAMIENTO!* 🔥\n` +
+    `Tenemos 7 combos armados a *$30.000 c/u con ENVÍO GRATIS* 🚚\n\n` +
+    `¿Querés verlos?\n\n` +
+    `1️⃣ Ver los Combos (¡recomendado!)\n` +
+    `2️⃣ Ver el catálogo completo\n\n` +
+    `_Escribí 1 o 2_`
+  );
+}
+
+async function handleCombosOCatalogo(phone, session, msg) {
+  if (msg === '1') {
+    session.step = 'viendo_combos';
+    return sendCombos(phone);
+  }
+  if (msg === '2') {
+    session.step = 'menu_principal';
+    return sendMenuPrincipal(phone, session);
+  }
+  await sendMessage(phone, '❓ Respondé *1* para ver combos o *2* para el catálogo.');
+}
+
+async function sendCombos(phone) {
+  const lista = COMBOS.map((c, i) =>
+    `*${i + 1}.* ${c.name}\n${c.description}\n💰 *${formatPrice(c.price)} — ENVÍO GRATIS* 🚚`
+  ).join('\n\n');
+
+  await sendMessage(phone,
+    `🔥 *COMBOS DE LANZAMIENTO FA24* 🔥\n\n${lista}\n\n` +
+    `─────────────────\n` +
+    `Respondé con el *número del combo* para agregarlo al carrito.\n` +
+    `Escribí *cat* para ir al catálogo completo.\n` +
+    `Escribí *menu* para volver al inicio.`
+  );
+}
+
+async function handleViendoCombos(phone, session, msg) {
+  if (msg === 'cat' || msg === 'catalogo' || msg === 'catálogo') {
+    session.step = 'menu_principal';
+    return sendMenuPrincipal(phone, session);
+  }
+
+  const idx = parseInt(msg) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= COMBOS.length) {
+    await sendMessage(phone, `❓ Respondé con un número del 1 al ${COMBOS.length}, o escribí *cat* para ver el catálogo.`);
+    return;
+  }
+
+  const combo = COMBOS[idx];
+  const existing = session.cart.find(i => i.id === combo.id);
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    session.cart.push({ id: combo.id, name: combo.name, price: combo.price, qty: 1 });
+  }
+
+  const total = getCartTotal(session.cart);
   session.step = 'menu_principal';
 
-  const msg =
-    `¡Hola! 👋 Bienvenido al delivery de *FA24* 🏪\n\n` +
-    `Elegí una opción:\n\n` +
+  await sendMessage(phone,
+    `✅ *${combo.name}* agregado al carrito!\n\n` +
+    `🛒 Total actual: *${formatPrice(total)}*\n\n` +
+    `¿Qué hacemos?\n` +
+    `1️⃣ Seguir comprando\n` +
+    `2️⃣ Ver mi carrito\n` +
+    `3️⃣ Finalizar pedido`
+  );
+}
+
+// ── MENÚ PRINCIPAL ────────────────────────────────────────────────────────────
+
+async function sendMenuPrincipal(phone, session) {
+  await sendMessage(phone,
+    `📋 *Menú principal:*\n\n` +
+    `🔥 Escribí *combos* para ver los combos de lanzamiento\n` +
     `1️⃣ Ver catálogo y pedir\n` +
     `2️⃣ Ver mi carrito\n` +
     `3️⃣ Finalizar pedido\n` +
-    `0️⃣ Reiniciar`;
-
-  await sendMessage(phone, msg);
+    `0️⃣ Reiniciar`
+  );
 }
 
 async function handleMenuPrincipal(phone, session, msg) {
+  if (msg === 'combos' || msg === 'combo') {
+    session.step = 'viendo_combos';
+    return sendCombos(phone);
+  }
   if (msg === '1') {
     session.step = 'seleccionando_categoria';
     return sendCategorias(phone);
   }
-  if (msg === '2') {
-    return sendCarrito(phone, session);
-  }
-  if (msg === '3') {
-    return iniciarCheckout(phone, session);
-  }
-  await sendMessage(phone, '❓ Opción no válida. Respondé *1*, *2* o *3*.\n\nEscribí *menu* para volver al inicio.');
+  if (msg === '2') return sendCarrito(phone, session);
+  if (msg === '3') return iniciarCheckout(phone, session);
+
+  await sendMessage(phone, '❓ Opción no válida. Respondé *1*, *2* o *3*, o escribí *combos* para ver las ofertas.');
 }
+
+// ── CATÁLOGO ──────────────────────────────────────────────────────────────────
 
 async function sendCategorias(phone) {
   const lista = CATEGORIES.map((c, i) => `${i + 1}️⃣ ${c.emoji} ${c.name}`).join('\n');
   await sendMessage(phone,
     `📦 *Categorías disponibles:*\n\n${lista}\n\n` +
     `Respondé con el número de la categoría.\n` +
-    `Escribí *menu* para volver.`
+    `Escribí *combos* para ver los combos o *menu* para volver.`
   );
 }
 
 async function handleSeleccionandoCategoria(phone, session, msg) {
+  if (msg === 'combos') {
+    session.step = 'viendo_combos';
+    return sendCombos(phone);
+  }
   const idx = parseInt(msg) - 1;
   if (isNaN(idx) || idx < 0 || idx >= CATEGORIES.length) {
     await sendMessage(phone, `❓ Respondé con un número del 1 al ${CATEGORIES.length}.`);
@@ -261,46 +359,40 @@ async function sendProductos(phone, cat) {
     await sendMessage(phone, '😕 No hay productos disponibles en esta categoría.');
     return;
   }
-
-  // Mostrar en bloques de 10 para no saturar
   const lista = prods.map((p, i) => `*${i + 1}.* ${p.name} — ${formatPrice(p.price)}`).join('\n');
-
   await sendMessage(phone,
     `${cat.emoji} *${cat.name}*\n\n${lista}\n\n` +
     `Respondé con el número del producto y la cantidad.\n` +
-    `Ejemplos: *3* (agrega 1) o *3 2* (agrega 2)\n\n` +
+    `Ejemplos: *3* (agrega 1) o *3 2* (agrega 2 unidades)\n\n` +
     `Escribí *cat* para ver otras categorías o *menu* para volver.`
   );
 }
 
 async function handleSeleccionandoProducto(phone, session, msg) {
-  if (msg === 'cat' || msg === 'categorias' || msg === 'categorías') {
+  if (msg === 'cat' || msg === 'categorias') {
     session.step = 'seleccionando_categoria';
     return sendCategorias(phone);
+  }
+  if (msg === 'combos') {
+    session.step = 'viendo_combos';
+    return sendCombos(phone);
   }
 
   const parts = msg.split(/\s+/);
   const idx = parseInt(parts[0]) - 1;
   const qty = parseInt(parts[1]) || 1;
-
   const prods = PRODUCTS[session.currentCategory] || [];
 
   if (isNaN(idx) || idx < 0 || idx >= prods.length) {
-    await sendMessage(phone,
-      `❓ Número no válido. Respondé con un número del 1 al ${prods.length}.\n` +
-      `Escribí *cat* para ver otras categorías.`
-    );
+    await sendMessage(phone, `❓ Número no válido. Respondé con un número del 1 al ${prods.length}.\nEscribí *cat* para ver otras categorías.`);
     return;
   }
-
   if (qty < 1 || qty > 20) {
     await sendMessage(phone, '❓ La cantidad debe ser entre 1 y 20.');
     return;
   }
 
   const prod = prods[idx];
-
-  // Agregar o actualizar carrito
   const existing = session.cart.find(i => i.id === prod.id);
   if (existing) {
     existing.qty += qty;
@@ -309,6 +401,7 @@ async function handleSeleccionandoProducto(phone, session, msg) {
   }
 
   const total = getCartTotal(session.cart);
+  session.step = 'menu_principal';
 
   await sendMessage(phone,
     `✅ *${qty}x ${prod.name}* agregado al carrito.\n\n` +
@@ -318,21 +411,19 @@ async function handleSeleccionandoProducto(phone, session, msg) {
     `2️⃣ Ver carrito\n` +
     `3️⃣ Finalizar pedido`
   );
-  session.step = 'menu_principal';
 }
+
+// ── CARRITO Y CHECKOUT ────────────────────────────────────────────────────────
 
 async function sendCarrito(phone, session) {
   const total = getCartTotal(session.cart);
   if (session.cart.length === 0) {
-    await sendMessage(phone,
-      `🛒 Tu carrito está vacío.\n\nEscribí *1* para ver el catálogo.`
-    );
+    await sendMessage(phone, `🛒 Tu carrito está vacío.\n\nEscribí *1* para ver el catálogo o *combos* para ver las ofertas.`);
     return;
   }
   await sendMessage(phone,
     `🛒 *Tu carrito:*\n\n${cartSummary(session.cart)}\n\n` +
     `💰 *Total: ${formatPrice(total)}*\n\n` +
-    `¿Qué hacemos?\n` +
     `1️⃣ Seguir comprando\n` +
     `3️⃣ Finalizar pedido\n` +
     `🗑️ Escribí *vaciar* para vaciar el carrito`
@@ -341,21 +432,19 @@ async function sendCarrito(phone, session) {
 
 async function iniciarCheckout(phone, session) {
   if (session.cart.length === 0) {
-    await sendMessage(phone, '🛒 Tu carrito está vacío. Escribí *1* para ver el catálogo.');
+    await sendMessage(phone, '🛒 Tu carrito está vacío. Escribí *1* para ver el catálogo o *combos* para ver las ofertas.');
     return;
   }
   const total = getCartTotal(session.cart);
   if (total < MIN_ORDER) {
     await sendMessage(phone,
       `⚠️ El pedido mínimo es *${formatPrice(MIN_ORDER)}*.\n` +
-      `Tu total es ${formatPrice(total)}. Agregá más productos.`
+      `Tu total es ${formatPrice(total)}. Agregá más productos o elegí un *combo* que ya alcanza el mínimo con envío gratis.`
     );
     return;
   }
   session.step = 'esperando_nombre';
-  await sendMessage(phone,
-    `📋 Vamos a confirmar tu pedido.\n\n*¿Cuál es tu nombre completo?*`
-  );
+  await sendMessage(phone, `📋 Vamos a confirmar tu pedido.\n\n*¿Cuál es tu nombre completo?*`);
 }
 
 async function handleEsperandoNombre(phone, session, text) {
@@ -383,7 +472,8 @@ async function handleEsperandoDireccion(phone, session, text) {
   await sendMessage(phone,
     `📝 *Resumen de tu pedido:*\n\n` +
     `${cartSummary(session.cart)}\n\n` +
-    `💰 *Total: ${formatPrice(total)}*\n\n` +
+    `💰 *Total: ${formatPrice(total)}*\n` +
+    `🚚 *Envío: GRATIS* ✅\n\n` +
     `👤 Nombre: ${session.name}\n` +
     `📍 Dirección: ${session.address}\n\n` +
     `¿Confirmás el pedido?\n` +
@@ -406,40 +496,17 @@ async function handleConfirmandoPedido(phone, session, msg) {
 
 async function confirmarPedido(phone, session) {
   const total = getCartTotal(session.cart);
-
-  // Guardar en QuickOrder AI via Base44 Superagent API
-  try {
-    if (BASE44_SUPERAGENT_URL) {
-      await axios.post(`${BASE44_SUPERAGENT_URL}/create_order`, {
-        customer_name: session.name,
-        customer_phone: phone,
-        customer_address: session.address,
-        items: session.cart.map(i => ({
-          product_name: i.name,
-          quantity: i.qty,
-          unit_price: i.price,
-          subtotal: i.price * i.qty,
-        })),
-        total,
-        status: 'pendiente',
-        whatsapp_session_id: phone,
-      });
-    }
-  } catch (err) {
-    console.error('Error guardando pedido:', err.message);
-  }
-
-  // Número de pedido simple basado en timestamp
   const orderNum = Date.now().toString().slice(-6);
 
   await sendMessage(phone,
     `🎉 *¡Pedido confirmado!* Nro. #${orderNum}\n\n` +
     `${cartSummary(session.cart)}\n\n` +
-    `💰 *Total: ${formatPrice(total)}*\n\n` +
+    `💰 *Total: ${formatPrice(total)}*\n` +
+    `🚚 *Envío: GRATIS* ✅\n\n` +
     `📍 Entrega en: ${session.address}\n\n` +
-    `💳 *Podés pagar con MercadoPago:*\n` +
+    `💳 *Pagá con MercadoPago:*\n` +
     `Alias: *${MERCADOPAGO_ALIAS}*\n\n` +
-    `⏱️ Tiempo estimado de entrega: *30-45 min*\n\n` +
+    `⏱️ Tiempo estimado: *30-45 min*\n\n` +
     `¡Gracias por elegirnos! 🙏 Escribí *hola* para hacer otro pedido.`
   );
 
@@ -460,25 +527,18 @@ app.get('/webhook', (req, res) => {
 });
 
 app.post('/webhook', async (req, res) => {
-  res.sendStatus(200); // responder rápido a Meta
-
+  res.sendStatus(200);
   try {
-    const entry = req.body?.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
-    const messages = value?.messages;
-
+    const messages = req.body?.entry?.[0]?.changes?.[0]?.value?.messages;
     if (!messages || messages.length === 0) return;
 
     const message = messages[0];
     const phone = message.from;
     const text = message.text?.body;
+    if (!text) return;
 
-    if (!text) return; // ignorar mensajes sin texto (imágenes, etc.)
-
-    console.log(`📩 Mensaje de ${phone}: ${text}`);
+    console.log(`📩 [${phone}]: ${text}`);
     await handleMessage(phone, text);
-
   } catch (err) {
     console.error('Error procesando webhook:', err.message);
   }
