@@ -230,11 +230,7 @@ async function handleCombosOCatalogo(phone, session, msg) {
 }
 
 async function sendCombos(phone) {
-  const combos = getCombos();
-  if (combos.length === 0) {
-    await sendMessage(phone, '😕 No hay combos disponibles en este momento. Escribí *2* para ver el catálogo completo.');
-    return;
-  }
+  const combos = COMBOS;
   // Mandamos los combos en dos mensajes para evitar límite de tamaño
   const mitad = Math.ceil(combos.length / 2);
   const parte1 = combos.slice(0, mitad).map((c, i) =>
@@ -259,7 +255,7 @@ async function handleViendoCombos(phone, session, msg) {
     session.step = 'menu_principal';
     return sendMenuPrincipal(phone);
   }
-  const combos = getCombos();
+  const combos = COMBOS;
   const idx = parseInt(msg) - 1;
   if (isNaN(idx) || idx < 0 || idx >= combos.length) {
     await sendMessage(phone, `❓ Respondé con un número del 1 al ${combos.length}, o escribí *cat* para ver el catálogo.`);
