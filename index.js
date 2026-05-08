@@ -486,25 +486,27 @@ async function confirmarPedido(phone, session) {
     `¡Gracias, ${session.name}! 🙏`
   );
 
-  // Guardar pedido en Base44
+  // Guardar pedido en QuickOrder AI
   const newOrder = {
-    order_number: orderNum,
     customer_name: session.name,
     customer_phone: phone,
-    address: session.address,
-    items: session.cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-    subtotal: total,
-    shipping: shipping,
+    customer_address: session.address,
+    items: JSON.stringify(session.cart.map(i => ({
+      product_name: i.name,
+      quantity: i.qty,
+      unit_price: i.price,
+      subtotal: i.price * i.qty
+    }))),
     total: totalFinal,
     status: 'pending',
-    payment_method: 'mercadopago',
+    notes: `Pago: MercadoPago | Pedido #${orderNum} | Envío: ${formatPrice(shipping)}`,
   };
 
   try {
-    const BASE44_API_KEY = process.env.BASE44_API_KEY || '2f8c3d3308ca4f2Sbedd5756ad6d06bf';
-    const BASE44_APP_ID = process.env.BASE44_APP_ID || '69f3622c3117e7478384228e';
+    const BASE44_API_KEY = process.env.BASE44_API_KEY || '2f8c3d3380ea4f25bedd5756ad6d06bf';
+    const BASE44_APP_ID = process.env.BASE44_APP_ID || '69effe843588f736a78e361e';
     const response = await axios.post(
-      `https://api.base44.com/api/apps/${BASE44_APP_ID}/entities/Order`,
+      `https://app.base44.com/api/apps/${BASE44_APP_ID}/entities/Order`,
       newOrder,
       { headers: { 'api_key': BASE44_API_KEY, 'Content-Type': 'application/json' } }
     );
