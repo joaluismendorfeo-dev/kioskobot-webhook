@@ -9,6 +9,8 @@ const VERIFY_TOKEN = 'kioskobot2026';
 const MERCADOPAGO_ALIAS = 'fa24encasa';
 const MIN_ORDER = 30000;
 const SHIPPING_COST = 2000;
+const ORDERS_FILE = '/app/orders.json';
+const fs = require('fs');
 
 // ─── COMBOS ───────────────────────────────────────────────────────────────────
 // Para actualizar combos, avisale al agente y los cambia en segundos.
@@ -484,6 +486,33 @@ async function confirmarPedido(phone, session) {
     `¡Gracias, ${session.name}! 🙏`
   );
 
+  // Guardar pedido en archivo JSON local
+  try {
+    let orders = [];
+    if (fs.existsSync(ORDERS_FILE)) {
+      orders = JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf8'));
+    }
+    const newOrder = {
+      order_number: orderNum,
+      customer_name: session.name,
+      customer_phone: phone,
+      address: session.address,
+      items: session.cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+      subtotal: total,
+      shipping: shipping,
+      total: totalFinal,
+      status: 'pending',
+      payment_method: 'mercadopago',
+      created_at: new Date().toISOString(),
+      synced: false
+    };
+    orders.push(newOrder);
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
+    console.log(`✅ Pedido #${orderNum} guardado localmente`);
+  } catch (err) {
+    console.error('❌ Error guardando pedido:', err.message);
+  }
+
   resetSession(phone);
 }
 
@@ -493,6 +522,34 @@ app.get('/webhook', (req, res) => {
   const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
   if (mode === 'subscribe' && token === VERIFY_TOKEN) res.status(200).send(challenge);
   else res.sendStatus(403);
+});
+
+// Endpoint para que Base44 consulte los pedidos pendientes de sincronizar
+app.get('/orders', (req, res) => {
+  const secret = req.query.secret;
+  if (secret !== 'kioskobot2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    if (!fs.existsSync(ORDERS_FILE)) return res.json({ orders: [] });
+    const orders = JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf8'));
+    res.json({ orders });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Marcar pedidos como sincronizados
+app.post('/orders/mark-synced', (req, res) => {
+  const { secret, order_numbers } = req.body;
+  if (secret !== 'kioskobot2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    if (!fs.existsSync(ORDERS_FILE)) return res.json({ ok: true });
+    let orders = JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf8'));
+    orders = orders.map(o => order_numbers.includes(o.order_number) ? { ...o, synced: true } : o);
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/webhook', async (req, res) => {
