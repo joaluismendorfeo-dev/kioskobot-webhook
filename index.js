@@ -8,6 +8,7 @@ const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID || '100013995383645';
 const VERIFY_TOKEN = 'kioskobot2026';
 const MERCADOPAGO_ALIAS = 'fa24encasa';
 const MIN_ORDER = 30000;
+const SHIPPING_COST = 2000;
 
 // ─── COMBOS ───────────────────────────────────────────────────────────────────
 // Para actualizar combos, avisale al agente y los cambia en segundos.
@@ -234,12 +235,18 @@ async function sendCombos(phone) {
     await sendMessage(phone, '😕 No hay combos disponibles en este momento. Escribí *2* para ver el catálogo completo.');
     return;
   }
-  const lista = combos.map((c, i) =>
+  // Mandamos los combos en dos mensajes para evitar límite de tamaño
+  const mitad = Math.ceil(combos.length / 2);
+  const parte1 = combos.slice(0, mitad).map((c, i) =>
     `*${i + 1}.* ${c.emoji || '🔥'} *${c.name}*\n${c.description}\n💰 *${formatPrice(c.price)} — ENVÍO GRATIS* 🚚`
   ).join('\n\n');
+  const parte2 = combos.slice(mitad).map((c, i) =>
+    `*${mitad + i + 1}.* ${c.emoji || '🔥'} *${c.name}*\n${c.description}\n💰 *${formatPrice(c.price)} — ENVÍO GRATIS* 🚚`
+  ).join('\n\n');
 
+  await sendMessage(phone, `🔥 *COMBOS DE LANZAMIENTO FA24* 🔥\n\n${parte1}`);
   await sendMessage(phone,
-    `🔥 *COMBOS DE LANZAMIENTO FA24* 🔥\n\n${lista}\n\n` +
+    `${parte2}\n\n` +
     `─────────────────\n` +
     `Respondé con el *número del combo* para agregarlo.\n` +
     `Escribí *cat* para ir al catálogo completo.\n` +
@@ -435,11 +442,16 @@ async function handleEsperandoDireccion(phone, session, text) {
   session.step = 'confirmando_pedido';
   const total = getCartTotal(session.cart);
 
+  const shipping = total >= MIN_ORDER ? 0 : SHIPPING_COST;
+  const totalFinal = total + shipping;
+  const shippingText = shipping === 0 ? '🚚 *Envío: GRATIS* ✅' : `🚚 *Envío: ${formatPrice(shipping)}*`;
+
   await sendMessage(phone,
     `📝 *Resumen del pedido:*\n\n` +
     `${cartSummary(session.cart)}\n\n` +
-    `💰 *Total: ${formatPrice(total)}*\n` +
-    `🚚 *Envío: GRATIS* ✅\n\n` +
+    `💰 Subtotal: ${formatPrice(total)}\n` +
+    `${shippingText}\n` +
+    `💵 *TOTAL: ${formatPrice(totalFinal)}*\n\n` +
     `👤 ${session.name}\n` +
     `📍 ${session.address}\n\n` +
     `✅ Escribí *sí* para confirmar\n❌ Escribí *no* para cancelar`
@@ -458,13 +470,17 @@ async function handleConfirmandoPedido(phone, session, msg) {
 
 async function confirmarPedido(phone, session) {
   const total = getCartTotal(session.cart);
+  const shipping = total >= MIN_ORDER ? 0 : SHIPPING_COST;
+  const totalFinal = total + shipping;
   const orderNum = Date.now().toString().slice(-6);
+  const shippingText = shipping === 0 ? '🚚 *Envío: GRATIS* ✅' : `🚚 *Envío: ${formatPrice(shipping)}*`;
 
   await sendMessage(phone,
     `🎉 *¡Pedido confirmado!* #${orderNum}\n\n` +
     `${cartSummary(session.cart)}\n\n` +
-    `💰 *Total: ${formatPrice(total)}*\n` +
-    `🚚 *Envío: GRATIS* ✅\n\n` +
+    `💰 Subtotal: ${formatPrice(total)}\n` +
+    `${shippingText}\n` +
+    `💵 *TOTAL A PAGAR: ${formatPrice(totalFinal)}*\n\n` +
     `📍 Entrega en: ${session.address}\n\n` +
     `💳 *Pagá con MercadoPago:*\n` +
     `Alias: *${MERCADOPAGO_ALIAS}*\n\n` +
