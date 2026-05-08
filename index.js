@@ -516,3 +516,4 @@ app.listen(PORT, () => {
   console.log(`🤖 KioskoBot corriendo en puerto ${PORT}`);
   getCombos(); // precarga combos al iniciar
 });
+// redeploy Fri May  8 05:34:45 UTC 2026
