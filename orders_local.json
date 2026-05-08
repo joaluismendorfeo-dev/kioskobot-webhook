@@ -1,0 +1,15 @@
+[
+  {
+    "order_number": "044544",
+    "customer_name": "Joaquín Méndez",
+    "customer_phone": "5492236887566",
+    "address": "Chaves 485",
+    "items": "[{\"id\":\"gol001\",\"name\":\"Alfajor Fantoche Pescado Raul Negro\",\"price\":1100,\"qty\":1},{\"id\":\"combo001\",\"name\":\"Combo Cine en Casa\",\"price\":30000,\"qty\":1}]",
+    "subtotal": 31100,
+    "shipping": 0,
+    "total": 31100,
+    "status": "pending",
+    "payment_method": "mercadopago",
+    "created_at": "2026-05-08T06:00:45.157Z"
+  }
+]
