@@ -491,12 +491,12 @@ async function confirmarPedido(phone, session) {
     customer_name: session.name,
     customer_phone: phone,
     customer_address: session.address,
-    items: JSON.stringify(session.cart.map(i => ({
+    items: session.cart.map(i => ({
       product_name: i.name,
       quantity: i.qty,
       unit_price: i.price,
       subtotal: i.price * i.qty
-    }))),
+    })),
     total: totalFinal,
     status: 'pending',
     notes: `Pago: MercadoPago | Pedido #${orderNum} | Envío: ${formatPrice(shipping)}`,
