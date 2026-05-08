@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "price": {
+      "type": "number"
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "emoji": {
+      "type": "string"
+    }
+  },
+  "required": [],
+  "name": "Combo"
+}
