@@ -9,6 +9,7 @@ const VERIFY_TOKEN = 'kioskobot2026';
 const MERCADOPAGO_ALIAS = 'fa24encasa';
 const MIN_ORDER = 30000;
 const SHIPPING_COST = 2000;
+const BASE44_API = 'https://us-central1-base44-prod.cloudfunctions.net/callFunction/kioskobotApi';
 
 // ─── COMBOS ───────────────────────────────────────────────────────────────────
 // Para actualizar combos, avisale al agente y los cambia en segundos.
@@ -483,6 +484,28 @@ async function confirmarPedido(phone, session) {
     `⏱️ Tiempo estimado: *30-45 min*\n\n` +
     `¡Gracias, ${session.name}! 🙏`
   );
+
+  // Guardar pedido en Base44
+  try {
+    await axios.post(BASE44_API, {
+      action: 'create_order',
+      order: {
+        customer_name: session.name,
+        customer_phone: phone,
+        address: session.address,
+        items: session.cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+        subtotal: total,
+        shipping: shipping,
+        total: totalFinal,
+        order_number: orderNum,
+        status: 'pending',
+        payment_method: 'mercadopago'
+      }
+    });
+    console.log(`✅ Pedido #${orderNum} guardado en Base44`);
+  } catch (err) {
+    console.error('❌ Error guardando pedido en Base44:', err.message);
+  }
 
   resetSession(phone);
 }
