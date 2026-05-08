@@ -1,6 +1,6 @@
 import { base44 } from 'npm:@base44/sdk@0.8.25/functions';
 
-// v2 - forzar redeploy
+// v4 - redeploy forzado
 Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => ({}));
@@ -13,12 +13,20 @@ Deno.serve(async (req: Request) => {
     if (!order) return Response.json({ error: 'order requerido' }, { status: 400 });
 
     const orderToSave = {
-      ...order,
-      items: typeof order.items === 'string' ? order.items : JSON.stringify(order.items)
+      order_number: order.order_number || String(Date.now()).slice(-6),
+      customer_name: order.customer_name || '',
+      customer_phone: order.customer_phone || '',
+      address: order.address || '',
+      items: typeof order.items === 'string' ? order.items : JSON.stringify(order.items || []),
+      subtotal: Number(order.subtotal) || 0,
+      shipping: Number(order.shipping) || 0,
+      total: Number(order.total) || 0,
+      status: order.status || 'pending',
+      payment_method: order.payment_method || 'mercadopago',
     };
 
     const created = await base44.asServiceRole.entities.Order.create(orderToSave);
-    return Response.json({ ok: true, data: created });
+    return Response.json({ ok: true, id: created.id, order_number: orderToSave.order_number });
 
   } catch (error: any) {
     return Response.json({ error: error.message }, { status: 500 });
