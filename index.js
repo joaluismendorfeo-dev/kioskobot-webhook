@@ -1,396 +1,490 @@
-const http = require('http');
-const https = require('https');
+const express = require('express');
+const axios = require('axios');
+const app = express();
+app.use(express.json());
 
-const VERIFY_TOKEN = 'kioskobot2026';
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = '1157127870810904';
-const BASE44_APP_ID = '69effe843588f736a78e361e';
-const BASE44_API = 'api.base44.com';
+const VERIFY_TOKEN = 'kioskobot2026';
+const BASE44_SUPERAGENT_URL = process.env.BASE44_SUPERAGENT_URL; // URL para crear pedidos
+const MERCADOPAGO_ALIAS = 'fa24encasa';
+const MIN_ORDER = 30000;
 
-// Sesiones activas por usuario: { from: { step, cart, name, address } }
-const sessions = {};
+// ─── DATOS DEL CATÁLOGO (sincronizados desde QuickOrder AI) ───────────────────
 
-// ─── Base44 API ───────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  { id: '69f000469cc4196e1b93ea27', name: 'Bebidas', emoji: '🥤', order: 1 },
+  { id: '69f000469cc4196e1b93ea28', name: 'Golosinas', emoji: '🍬', order: 2 },
+  { id: '69f0e4ef4de5adae291d0409', name: 'Snack Quento', emoji: '🛍️', order: 3 },
+  { id: '69f000469cc4196e1b93ea2a', name: 'Almacén', emoji: '🛒', order: 4 },
+  { id: '69f000469cc4196e1b93ea2b', name: 'Cigarrillos', emoji: '🚬', order: 5 },
+  { id: '69f000469cc4196e1b93ea2c', name: 'Artículos de limpieza', emoji: '🧹', order: 6 },
+];
 
-function base44Request(method, path, data) {
-  return new Promise((resolve, reject) => {
-    const body = data ? JSON.stringify(data) : null;
-    const options = {
-      hostname: BASE44_API,
-      path: `/api/apps/${BASE44_APP_ID}/entities${path}`,
-      method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.BASE44_API_KEY || ''
-      }
+const PRODUCTS = {
+  // BEBIDAS
+  '69f000469cc4196e1b93ea27': [
+    { id: 'beb001', name: 'Coca Cola Lata 473ML', price: 3200 },
+    { id: 'beb002', name: 'Monster Mango 473ML', price: 5200 },
+    { id: 'beb003', name: 'Monster Peachy 473ML', price: 5200 },
+    { id: 'beb004', name: 'Monster Verde 473ML', price: 5200 },
+    { id: 'beb005', name: 'Red Bull 250ML', price: 4500 },
+    { id: 'beb006', name: 'Sprite Lata 473ML', price: 3200 },
+    { id: 'beb007', name: 'Fanta Lata 473ML', price: 3200 },
+    { id: 'beb008', name: 'Powerade 500ML', price: 3000 },
+    { id: 'beb009', name: 'Gatorade 500ML', price: 2800 },
+    { id: 'beb010', name: 'Agua 500ML Benedictino', price: 1600 },
+    { id: 'beb011', name: 'Agua 1500ML Benedictino', price: 2300 },
+    { id: 'beb012', name: 'Aquarius 1500ML Manzana', price: 3800 },
+    { id: 'beb013', name: 'Aquarius 1500ML Naranja', price: 3800 },
+    { id: 'beb014', name: 'Aquarius 1500ML Pera', price: 3800 },
+    { id: 'beb015', name: 'Aquarius 1500ML Uva', price: 3800 },
+  ],
+  // GOLOSINAS
+  '69f000469cc4196e1b93ea28': [
+    { id: 'gol001', name: 'Alfajor Fantoche Pescado Raul Negro', price: 1100 },
+    { id: 'gol002', name: 'Alfajor Fantoche Pescado Raul Blanco', price: 1100 },
+    { id: 'gol003', name: 'Alfajor Fantoche Red Velvet', price: 1600 },
+    { id: 'gol004', name: 'Alfajor Jorgelin Glaseado Triple', price: 2200 },
+    { id: 'gol005', name: 'Alfajor Jorgelin Triple Negro', price: 2200 },
+    { id: 'gol006', name: 'Alfajor Arcor Triple CHOCOTORTA', price: 2400 },
+    { id: 'gol007', name: 'Alfajor Arcor Triple BON O BON Blanco', price: 2400 },
+    { id: 'gol008', name: 'Alfajor Arcor Triple B&N', price: 2400 },
+    { id: 'gol009', name: 'Alfajor Arcor Triple Tofi Negro', price: 2400 },
+    { id: 'gol010', name: 'Alfajor Arcor Triple Tofi Blanco', price: 2400 },
+    { id: 'gol011', name: 'Alfajor Arcor Triple Tatin Negro', price: 1400 },
+    { id: 'gol012', name: 'Alfajor Arcor Triple Tatin Blanco', price: 1400 },
+    { id: 'gol013', name: 'Alfajor Milka Terrabussi Triple', price: 2800 },
+    { id: 'gol014', name: 'Alfajor Milka Blanco Triple', price: 2800 },
+    { id: 'gol015', name: 'Alfajor Milka Mousse Negro Triple', price: 2800 },
+    { id: 'gol016', name: 'Alfajor Milka Oreo Triple', price: 2800 },
+    { id: 'gol017', name: 'Alfajor Milka Pepitos Triple', price: 2800 },
+    { id: 'gol018', name: 'Alfajor MILKA SHOT Triple', price: 2800 },
+  ],
+  // SNACK QUENTO
+  '69f0e4ef4de5adae291d0409': [
+    { id: 'snk001', name: 'Papas Clasicas 92g', price: 3900 },
+    { id: 'snk002', name: 'Papas Onduladas 92g', price: 3900 },
+    { id: 'snk003', name: 'Papas Asado Criollo 92g', price: 3900 },
+    { id: 'snk004', name: 'Papas Cheddar 92g', price: 3900 },
+    { id: 'snk005', name: 'Papas Ketchup 82g', price: 3900 },
+    { id: 'snk006', name: 'Papas Limon 82g', price: 3900 },
+    { id: 'snk007', name: 'Papas Salame 82g', price: 3900 },
+    { id: 'snk008', name: 'Papas Jamon Serrano 82g', price: 3900 },
+    { id: 'snk009', name: 'Papas Barbacoa 82g', price: 3900 },
+    { id: 'snk010', name: 'Papas Crema Y Ciboulette 82g', price: 3900 },
+    { id: 'snk011', name: 'Nachos Queso 82g', price: 3900 },
+    { id: 'snk012', name: 'Conos Queso 80g', price: 3900 },
+    { id: 'snk013', name: 'Batatas Cebolla Caramelizada', price: 3900 },
+    { id: 'snk014', name: 'Batatas Mostaza y Miel 70g', price: 3900 },
+    { id: 'snk015', name: 'Batatas Capresse 70g', price: 3900 },
+    { id: 'snk016', name: 'Chizitos MegaQueso 95g', price: 3500 },
+    { id: 'snk017', name: 'Papas Mix 100g', price: 3900 },
+    { id: 'snk018', name: 'Palitos Clasicos 82g', price: 3200 },
+    { id: 'snk019', name: 'Palitos Panceta 85g', price: 3200 },
+    { id: 'snk020', name: 'Palitos Queso 85g', price: 3200 },
+  ],
+  // ALMACÉN
+  '69f000469cc4196e1b93ea2a': [
+    { id: 'alm001', name: 'Galletitas Vocación x200g', price: 2500 },
+    { id: 'alm002', name: 'Galletitas Oreo x119g', price: 2800 },
+    { id: 'alm003', name: 'Maní Con Chocolate', price: 1800 },
+    { id: 'alm004', name: 'Chicle Beldent x10u', price: 1200 },
+  ],
+  // CIGARRILLOS
+  '69f000469cc4196e1b93ea2b': [
+    { id: 'cig001', name: 'Marlboro Rojo x20', price: 4500 },
+    { id: 'cig002', name: 'Marlboro Gold x20', price: 4500 },
+    { id: 'cig003', name: 'Lucky Strike x20', price: 4200 },
+    { id: 'cig004', name: 'Parliament x20', price: 5000 },
+  ],
+  // ARTÍCULOS DE LIMPIEZA
+  '69f000469cc4196e1b93ea2c': [
+    { id: 'lim001', name: 'Lavandina 1L', price: 1800 },
+    { id: 'lim002', name: 'Detergente 500ML', price: 2200 },
+    { id: 'lim003', name: 'Jabón en Polvo 250g', price: 2500 },
+  ],
+};
+
+// ─── SESIONES ─────────────────────────────────────────────────────────────────
+
+const sessions = {}; // key: phoneNumber
+
+function getSession(phone) {
+  if (!sessions[phone]) {
+    sessions[phone] = {
+      step: 'inicio',
+      cart: [],
+      name: null,
+      address: null,
+      currentCategory: null,
     };
-    if (body) options.headers['Content-Length'] = Buffer.byteLength(body);
-
-    const req = https.request(options, (res) => {
-      let responseBody = '';
-      res.on('data', (chunk) => { responseBody += chunk; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(responseBody)); }
-        catch (e) { resolve({}); }
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(body);
-    req.end();
-  });
-}
-
-async function getCategories() {
-  try {
-    const result = await base44Request('GET', '/Category/?active=true');
-    return (result.records || result || []).sort((a, b) => (a.order || 0) - (b.order || 0));
-  } catch (e) { return []; }
-}
-
-async function getProductsByCategory(categoryId) {
-  try {
-    const result = await base44Request('GET', `/Product/?category_id=${categoryId}&active=true`);
-    return result.records || result || [];
-  } catch (e) { return []; }
-}
-
-async function getStoreConfig() {
-  try {
-    const result = await base44Request('GET', '/StoreConfig/');
-    const records = result.records || result || [];
-    return records[0] || {};
-  } catch (e) { return {}; }
-}
-
-async function createOrder(orderData) {
-  try {
-    const result = await base44Request('POST', '/Order/', orderData);
-    return result;
-  } catch (e) { return null; }
-}
-
-// ─── WhatsApp ─────────────────────────────────────────────────────────────────
-
-function sendMessage(to, message) {
-  const data = JSON.stringify({
-    messaging_product: 'whatsapp',
-    to: to,
-    type: 'text',
-    text: { body: message }
-  });
-
-  const options = {
-    hostname: 'graph.facebook.com',
-    path: `/v19.0/${PHONE_NUMBER_ID}/messages`,
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(data)
-    }
-  };
-
-  const req = https.request(options, (res) => {
-    let body = '';
-    res.on('data', c => body += c);
-    res.on('end', () => console.log('WA response:', res.statusCode, body));
-  });
-  req.on('error', e => console.error('Error WA:', e.message));
-  req.write(data);
-  req.end();
-}
-
-// ─── Lógica del bot ───────────────────────────────────────────────────────────
-
-function formatPrice(price) {
-  return `$${Number(price).toLocaleString('es-AR')}`;
-}
-
-function getSession(from) {
-  if (!sessions[from]) {
-    sessions[from] = { step: 'inicio', cart: [], name: '', address: '' };
   }
-  return sessions[from];
+  return sessions[phone];
 }
 
-function resetSession(from) {
-  sessions[from] = { step: 'inicio', cart: [], name: '', address: '' };
+function resetSession(phone) {
+  sessions[phone] = {
+    step: 'inicio',
+    cart: [],
+    name: null,
+    address: null,
+    currentCategory: null,
+  };
 }
 
-function cartTotal(cart) {
-  return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+function formatPrice(n) {
+  return '$' + Number(n).toLocaleString('es-AR');
+}
+
+function getCartTotal(cart) {
+  return cart.reduce((t, i) => t + i.price * i.qty, 0);
 }
 
 function cartSummary(cart) {
-  return cart.map(i => `  • ${i.name} x${i.qty} = ${formatPrice(i.price * i.qty)}`).join('\n');
+  if (cart.length === 0) return '_(vacío)_';
+  return cart.map(i => `• ${i.name} x${i.qty} = ${formatPrice(i.price * i.qty)}`).join('\n');
 }
 
-async function handleMessage(from, text) {
-  const session = getSession(from);
-  const input = (text || '').trim().toLowerCase();
-
-  // Comandos globales
-  if (input === 'cancelar' || input === 'cancel') {
-    resetSession(from);
-    sendMessage(from, '❌ Pedido cancelado. Escribí *hola* para empezar de nuevo.');
-    return;
-  }
-
-  if (input === 'carrito') {
-    if (session.cart.length === 0) {
-      sendMessage(from, '🛒 Tu carrito está vacío.');
-    } else {
-      sendMessage(from, `🛒 *Tu carrito:*\n${cartSummary(session.cart)}\n\n*Total: ${formatPrice(cartTotal(session.cart))}*`);
-    }
-    return;
-  }
-
-  // ── PASO: inicio ─────────────────────────────────────────────────────────
-  if (session.step === 'inicio' || input === 'hola' || input === 'menu' || input === 'menú') {
-    const config = await getStoreConfig();
-    const categories = await getCategories();
-
-    if (!config.open) {
-      sendMessage(from, '😴 Lo sentimos, el local está cerrado ahora. ¡Volvé más tarde!');
-      return;
-    }
-
-    let msg = `${config.welcome_message || '¡Hola! Bienvenido a FA24 🛍️'}\n\n`;
-    msg += `📋 *Categorías disponibles:*\n`;
-    categories.forEach((cat, i) => {
-      msg += `${i + 1}. ${cat.emoji || ''} ${cat.name}\n`;
-    });
-    msg += `\nRespondé con el *número* de la categoría que querés ver.\n`;
-    msg += `\n💡 Otros comandos:\n• *carrito* - ver tu pedido\n• *confirmar* - finalizar pedido\n• *cancelar* - empezar de nuevo`;
-
-    session.step = 'elegir_categoria';
-    session.categories = categories;
-    sendMessage(from, msg);
-    return;
-  }
-
-  // ── PASO: elegir categoría ────────────────────────────────────────────────
-  if (session.step === 'elegir_categoria') {
-    const num = parseInt(input);
-    const categories = session.categories || [];
-
-    if (isNaN(num) || num < 1 || num > categories.length) {
-      sendMessage(from, `Por favor respondé con un número del 1 al ${categories.length}.`);
-      return;
-    }
-
-    const cat = categories[num - 1];
-    const products = await getProductsByCategory(cat.id);
-    const available = products.filter(p => p.active && p.stock > 0);
-
-    if (available.length === 0) {
-      sendMessage(from, `😕 No hay productos disponibles en *${cat.name}* ahora mismo. Elegí otra categoría.`);
-      return;
-    }
-
-    let msg = `${cat.emoji || ''} *${cat.name}*\n\n`;
-    available.forEach((p, i) => {
-      msg += `${i + 1}. ${p.name} - ${formatPrice(p.price)}\n`;
-    });
-    msg += `\nRespondé con el *número* del producto que querés agregar al carrito.\nO escribí *volver* para ver las categorías.`;
-
-    session.step = 'elegir_producto';
-    session.currentCategory = cat;
-    session.currentProducts = available;
-    sendMessage(from, msg);
-    return;
-  }
-
-  // ── PASO: elegir producto ─────────────────────────────────────────────────
-  if (session.step === 'elegir_producto') {
-    if (input === 'volver') {
-      session.step = 'elegir_categoria';
-      const categories = session.categories || [];
-      let msg = `📋 *Categorías disponibles:*\n`;
-      categories.forEach((cat, i) => { msg += `${i + 1}. ${cat.emoji || ''} ${cat.name}\n`; });
-      msg += `\nElegí una categoría:`;
-      sendMessage(from, msg);
-      return;
-    }
-
-    if (input === 'confirmar') {
-      if (session.cart.length === 0) {
-        sendMessage(from, '🛒 Tu carrito está vacío. Agregá productos primero.');
-        return;
-      }
-      session.step = 'pedir_nombre';
-      sendMessage(from, `¿Cuál es tu *nombre y apellido*?`);
-      return;
-    }
-
-    const num = parseInt(input);
-    const products = session.currentProducts || [];
-
-    if (isNaN(num) || num < 1 || num > products.length) {
-      sendMessage(from, `Por favor respondé con un número del 1 al ${products.length}, *volver* o *confirmar*.`);
-      return;
-    }
-
-    const product = products[num - 1];
-    const existing = session.cart.find(i => i.id === product.id);
-    if (existing) {
-      existing.qty += 1;
-    } else {
-      session.cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
-    }
-
-    const total = cartTotal(session.cart);
-    let msg = `✅ *${product.name}* agregado al carrito!\n\n`;
-    msg += `🛒 *Carrito actual:*\n${cartSummary(session.cart)}\n\n`;
-    msg += `*Total: ${formatPrice(total)}*\n\n`;
-    msg += `Respondé con:\n• Un *número* para agregar otro producto\n• *volver* para cambiar de categoría\n• *confirmar* para finalizar el pedido`;
-
-    sendMessage(from, msg);
-    return;
-  }
-
-  // ── PASO: pedir nombre ────────────────────────────────────────────────────
-  if (session.step === 'pedir_nombre') {
-    if (text.trim().length < 3) {
-      sendMessage(from, 'Por favor ingresá tu nombre completo.');
-      return;
-    }
-    session.name = text.trim();
-    session.step = 'pedir_direccion';
-    sendMessage(from, `📍 ¿Cuál es tu *dirección de entrega*? (calle, número, piso/depto si aplica)`);
-    return;
-  }
-
-  // ── PASO: pedir dirección ─────────────────────────────────────────────────
-  if (session.step === 'pedir_direccion') {
-    if (text.trim().length < 5) {
-      sendMessage(from, 'Por favor ingresá una dirección válida.');
-      return;
-    }
-    session.address = text.trim();
-    session.step = 'confirmar_pedido';
-
-    const config = await getStoreConfig();
-    const total = cartTotal(session.cart);
-    const minOrder = config.min_order || 0;
-
-    if (total < minOrder) {
-      sendMessage(from, `⚠️ El pedido mínimo es ${formatPrice(minOrder)}. Tu total actual es ${formatPrice(total)}. Agregá más productos con *volver*.`);
-      session.step = 'elegir_producto';
-      return;
-    }
-
-    let msg = `📦 *Resumen de tu pedido:*\n\n`;
-    msg += `👤 *Nombre:* ${session.name}\n`;
-    msg += `📍 *Dirección:* ${session.address}\n\n`;
-    msg += `🛒 *Productos:*\n${cartSummary(session.cart)}\n\n`;
-    msg += `💰 *Total: ${formatPrice(total)}*\n`;
-    if (config.delivery_fee > 0) msg += `🚚 *Envío: ${formatPrice(config.delivery_fee)}*\n`;
-    if (config.mercadopago_alias) msg += `\n💳 *Pago:* Transferencia al alias *${config.mercadopago_alias}*\n`;
-    msg += `\n¿Confirmás el pedido?\n✅ Respondé *SI* para confirmar\n❌ Respondé *NO* para cancelar`;
-
-    sendMessage(from, msg);
-    return;
-  }
-
-  // ── PASO: confirmación final ──────────────────────────────────────────────
-  if (session.step === 'confirmar_pedido') {
-    if (input === 'si' || input === 'sí' || input === 's') {
-      const config = await getStoreConfig();
-      const total = cartTotal(session.cart);
-
-      const orderData = {
-        customer_name: session.name,
-        customer_phone: from,
-        customer_address: session.address,
-        items: session.cart.map(i => ({ product_id: i.id, name: i.name, price: i.price, quantity: i.qty })),
-        total: total + (config.delivery_fee || 0),
-        status: 'pending',
-        notes: '',
-        whatsapp_session_id: from
-      };
-
-      await createOrder(orderData);
-
-      let msg = `🎉 *¡Pedido confirmado!*\n\n`;
-      msg += `Tu pedido fue recibido y está siendo preparado.\n`;
-      if (config.mercadopago_alias) {
-        msg += `\n💳 Recordá transferir *${formatPrice(total)}* al alias *${config.mercadopago_alias}*\n`;
-      }
-      msg += `\n¡Gracias por elegirnos! 🙌`;
-
-      sendMessage(from, msg);
-      resetSession(from);
-
-    } else if (input === 'no' || input === 'n') {
-      resetSession(from);
-      sendMessage(from, '❌ Pedido cancelado. Escribí *hola* para empezar de nuevo.');
-    } else {
-      sendMessage(from, 'Respondé *SI* para confirmar o *NO* para cancelar.');
-    }
-    return;
-  }
-
-  // ── Mensaje no reconocido ─────────────────────────────────────────────────
-  sendMessage(from, '👋 Escribí *hola* para ver el menú y hacer tu pedido.');
-}
-
-// ─── Servidor HTTP ────────────────────────────────────────────────────────────
-
-const server = http.createServer((req, res) => {
+async function sendMessage(to, text) {
   try {
-    const url = new URL(req.url, 'http://localhost');
+    await axios.post(
+      `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: text },
+      },
+      { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } }
+    );
+  } catch (err) {
+    console.error('Error enviando mensaje:', err.response?.data || err.message);
+  }
+}
 
-    if (req.method === 'GET') {
-      const mode = url.searchParams.get('hub.mode');
-      const token = url.searchParams.get('hub.verify_token');
-      const challenge = url.searchParams.get('hub.challenge');
-      if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        res.writeHead(200);
-        res.end(challenge);
-      } else {
-        res.writeHead(403);
-        res.end('Forbidden');
-      }
+// ─── LÓGICA DEL BOT ──────────────────────────────────────────────────────────
 
-    } else if (req.method === 'POST') {
-      let body = '';
-      req.on('data', (chunk) => { body += chunk.toString(); });
-      req.on('end', async () => {
-        try {
-          const payload = JSON.parse(body);
-          const entry = payload.entry && payload.entry[0];
-          const changes = entry && entry.changes && entry.changes[0];
-          const value = changes && changes.value;
-          const messages = value && value.messages;
+async function handleMessage(phone, text) {
+  const session = getSession(phone);
+  const msg = text.trim().toLowerCase();
 
-          if (messages && messages[0]) {
-            const msg = messages[0];
-            const from = msg.from;
-            const text = msg.text && msg.text.body;
-            console.log(`Mensaje de ${from}: ${text}`);
-            await handleMessage(from, text || '');
-          }
-        } catch (e) {
-          console.error('Error procesando mensaje:', e.message);
-        }
-        res.writeHead(200);
-        res.end('OK');
+  // Comando universal de reinicio
+  if (['reiniciar', 'inicio', 'hola', 'menu', 'menú', '0'].includes(msg)) {
+    resetSession(phone);
+    return sendWelcome(phone);
+  }
+
+  switch (session.step) {
+    case 'inicio':
+      return sendWelcome(phone);
+
+    case 'menu_principal':
+      return handleMenuPrincipal(phone, session, msg);
+
+    case 'seleccionando_categoria':
+      return handleSeleccionandoCategoria(phone, session, msg);
+
+    case 'seleccionando_producto':
+      return handleSeleccionandoProducto(phone, session, msg);
+
+    case 'esperando_nombre':
+      return handleEsperandoNombre(phone, session, text);
+
+    case 'esperando_direccion':
+      return handleEsperandoDireccion(phone, session, text);
+
+    case 'confirmando_pedido':
+      return handleConfirmandoPedido(phone, session, msg);
+
+    default:
+      resetSession(phone);
+      return sendWelcome(phone);
+  }
+}
+
+async function sendWelcome(phone) {
+  const session = getSession(phone);
+  session.step = 'menu_principal';
+
+  const msg =
+    `¡Hola! 👋 Bienvenido al delivery de *FA24* 🏪\n\n` +
+    `Elegí una opción:\n\n` +
+    `1️⃣ Ver catálogo y pedir\n` +
+    `2️⃣ Ver mi carrito\n` +
+    `3️⃣ Finalizar pedido\n` +
+    `0️⃣ Reiniciar`;
+
+  await sendMessage(phone, msg);
+}
+
+async function handleMenuPrincipal(phone, session, msg) {
+  if (msg === '1') {
+    session.step = 'seleccionando_categoria';
+    return sendCategorias(phone);
+  }
+  if (msg === '2') {
+    return sendCarrito(phone, session);
+  }
+  if (msg === '3') {
+    return iniciarCheckout(phone, session);
+  }
+  await sendMessage(phone, '❓ Opción no válida. Respondé *1*, *2* o *3*.\n\nEscribí *menu* para volver al inicio.');
+}
+
+async function sendCategorias(phone) {
+  const lista = CATEGORIES.map((c, i) => `${i + 1}️⃣ ${c.emoji} ${c.name}`).join('\n');
+  await sendMessage(phone,
+    `📦 *Categorías disponibles:*\n\n${lista}\n\n` +
+    `Respondé con el número de la categoría.\n` +
+    `Escribí *menu* para volver.`
+  );
+}
+
+async function handleSeleccionandoCategoria(phone, session, msg) {
+  const idx = parseInt(msg) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= CATEGORIES.length) {
+    await sendMessage(phone, `❓ Respondé con un número del 1 al ${CATEGORIES.length}.`);
+    return;
+  }
+  const cat = CATEGORIES[idx];
+  session.currentCategory = cat.id;
+  session.step = 'seleccionando_producto';
+  return sendProductos(phone, cat);
+}
+
+async function sendProductos(phone, cat) {
+  const prods = PRODUCTS[cat.id] || [];
+  if (prods.length === 0) {
+    await sendMessage(phone, '😕 No hay productos disponibles en esta categoría.');
+    return;
+  }
+
+  // Mostrar en bloques de 10 para no saturar
+  const lista = prods.map((p, i) => `*${i + 1}.* ${p.name} — ${formatPrice(p.price)}`).join('\n');
+
+  await sendMessage(phone,
+    `${cat.emoji} *${cat.name}*\n\n${lista}\n\n` +
+    `Respondé con el número del producto y la cantidad.\n` +
+    `Ejemplos: *3* (agrega 1) o *3 2* (agrega 2)\n\n` +
+    `Escribí *cat* para ver otras categorías o *menu* para volver.`
+  );
+}
+
+async function handleSeleccionandoProducto(phone, session, msg) {
+  if (msg === 'cat' || msg === 'categorias' || msg === 'categorías') {
+    session.step = 'seleccionando_categoria';
+    return sendCategorias(phone);
+  }
+
+  const parts = msg.split(/\s+/);
+  const idx = parseInt(parts[0]) - 1;
+  const qty = parseInt(parts[1]) || 1;
+
+  const prods = PRODUCTS[session.currentCategory] || [];
+
+  if (isNaN(idx) || idx < 0 || idx >= prods.length) {
+    await sendMessage(phone,
+      `❓ Número no válido. Respondé con un número del 1 al ${prods.length}.\n` +
+      `Escribí *cat* para ver otras categorías.`
+    );
+    return;
+  }
+
+  if (qty < 1 || qty > 20) {
+    await sendMessage(phone, '❓ La cantidad debe ser entre 1 y 20.');
+    return;
+  }
+
+  const prod = prods[idx];
+
+  // Agregar o actualizar carrito
+  const existing = session.cart.find(i => i.id === prod.id);
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    session.cart.push({ ...prod, qty });
+  }
+
+  const total = getCartTotal(session.cart);
+
+  await sendMessage(phone,
+    `✅ *${qty}x ${prod.name}* agregado al carrito.\n\n` +
+    `🛒 Total actual: *${formatPrice(total)}*\n\n` +
+    `¿Qué hacemos?\n` +
+    `1️⃣ Seguir comprando\n` +
+    `2️⃣ Ver carrito\n` +
+    `3️⃣ Finalizar pedido`
+  );
+  session.step = 'menu_principal';
+}
+
+async function sendCarrito(phone, session) {
+  const total = getCartTotal(session.cart);
+  if (session.cart.length === 0) {
+    await sendMessage(phone,
+      `🛒 Tu carrito está vacío.\n\nEscribí *1* para ver el catálogo.`
+    );
+    return;
+  }
+  await sendMessage(phone,
+    `🛒 *Tu carrito:*\n\n${cartSummary(session.cart)}\n\n` +
+    `💰 *Total: ${formatPrice(total)}*\n\n` +
+    `¿Qué hacemos?\n` +
+    `1️⃣ Seguir comprando\n` +
+    `3️⃣ Finalizar pedido\n` +
+    `🗑️ Escribí *vaciar* para vaciar el carrito`
+  );
+}
+
+async function iniciarCheckout(phone, session) {
+  if (session.cart.length === 0) {
+    await sendMessage(phone, '🛒 Tu carrito está vacío. Escribí *1* para ver el catálogo.');
+    return;
+  }
+  const total = getCartTotal(session.cart);
+  if (total < MIN_ORDER) {
+    await sendMessage(phone,
+      `⚠️ El pedido mínimo es *${formatPrice(MIN_ORDER)}*.\n` +
+      `Tu total es ${formatPrice(total)}. Agregá más productos.`
+    );
+    return;
+  }
+  session.step = 'esperando_nombre';
+  await sendMessage(phone,
+    `📋 Vamos a confirmar tu pedido.\n\n*¿Cuál es tu nombre completo?*`
+  );
+}
+
+async function handleEsperandoNombre(phone, session, text) {
+  if (text.trim().length < 2) {
+    await sendMessage(phone, '❓ Por favor ingresá tu nombre completo.');
+    return;
+  }
+  session.name = text.trim();
+  session.step = 'esperando_direccion';
+  await sendMessage(phone,
+    `Perfecto, *${session.name}*! 👍\n\n*¿Cuál es tu dirección de entrega?*\n_(Calle, número y piso/depto si corresponde)_`
+  );
+}
+
+async function handleEsperandoDireccion(phone, session, text) {
+  if (text.trim().length < 5) {
+    await sendMessage(phone, '❓ Por favor ingresá tu dirección completa.');
+    return;
+  }
+  session.address = text.trim();
+  session.step = 'confirmando_pedido';
+
+  const total = getCartTotal(session.cart);
+
+  await sendMessage(phone,
+    `📝 *Resumen de tu pedido:*\n\n` +
+    `${cartSummary(session.cart)}\n\n` +
+    `💰 *Total: ${formatPrice(total)}*\n\n` +
+    `👤 Nombre: ${session.name}\n` +
+    `📍 Dirección: ${session.address}\n\n` +
+    `¿Confirmás el pedido?\n` +
+    `✅ Escribí *sí* para confirmar\n` +
+    `❌ Escribí *no* para cancelar`
+  );
+}
+
+async function handleConfirmandoPedido(phone, session, msg) {
+  if (['si', 'sí', 's', 'yes', 'confirmar', 'confirmo'].includes(msg)) {
+    return confirmarPedido(phone, session);
+  }
+  if (['no', 'cancelar', 'n'].includes(msg)) {
+    resetSession(phone);
+    await sendMessage(phone, '❌ Pedido cancelado. Escribí *hola* para volver a empezar.');
+    return;
+  }
+  await sendMessage(phone, '❓ Respondé *sí* para confirmar o *no* para cancelar.');
+}
+
+async function confirmarPedido(phone, session) {
+  const total = getCartTotal(session.cart);
+
+  // Guardar en QuickOrder AI via Base44 Superagent API
+  try {
+    if (BASE44_SUPERAGENT_URL) {
+      await axios.post(`${BASE44_SUPERAGENT_URL}/create_order`, {
+        customer_name: session.name,
+        customer_phone: phone,
+        customer_address: session.address,
+        items: session.cart.map(i => ({
+          product_name: i.name,
+          quantity: i.qty,
+          unit_price: i.price,
+          subtotal: i.price * i.qty,
+        })),
+        total,
+        status: 'pendiente',
+        whatsapp_session_id: phone,
       });
-
-    } else {
-      res.writeHead(200);
-      res.end('OK');
     }
+  } catch (err) {
+    console.error('Error guardando pedido:', err.message);
+  }
 
-  } catch (e) {
-    console.error('Error servidor:', e.message);
-    res.writeHead(500);
-    res.end('Error');
+  // Número de pedido simple basado en timestamp
+  const orderNum = Date.now().toString().slice(-6);
+
+  await sendMessage(phone,
+    `🎉 *¡Pedido confirmado!* Nro. #${orderNum}\n\n` +
+    `${cartSummary(session.cart)}\n\n` +
+    `💰 *Total: ${formatPrice(total)}*\n\n` +
+    `📍 Entrega en: ${session.address}\n\n` +
+    `💳 *Podés pagar con MercadoPago:*\n` +
+    `Alias: *${MERCADOPAGO_ALIAS}*\n\n` +
+    `⏱️ Tiempo estimado de entrega: *30-45 min*\n\n` +
+    `¡Gracias por elegirnos! 🙏 Escribí *hola* para hacer otro pedido.`
+  );
+
+  resetSession(phone);
+}
+
+// ─── WEBHOOK ──────────────────────────────────────────────────────────────────
+
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
   }
 });
+
+app.post('/webhook', async (req, res) => {
+  res.sendStatus(200); // responder rápido a Meta
+
+  try {
+    const entry = req.body?.entry?.[0];
+    const change = entry?.changes?.[0];
+    const value = change?.value;
+    const messages = value?.messages;
+
+    if (!messages || messages.length === 0) return;
+
+    const message = messages[0];
+    const phone = message.from;
+    const text = message.text?.body;
+
+    if (!text) return; // ignorar mensajes sin texto (imágenes, etc.)
+
+    console.log(`📩 Mensaje de ${phone}: ${text}`);
+    await handleMessage(phone, text);
+
+  } catch (err) {
+    console.error('Error procesando webhook:', err.message);
+  }
+});
+
+app.get('/', (req, res) => res.send('KioskoBot ✅ funcionando'));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`KioskoBot corriendo en puerto ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🤖 KioskoBot corriendo en puerto ${PORT}`));
