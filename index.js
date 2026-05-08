@@ -4,7 +4,7 @@ const app = express();
 app.use(express.json());
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const PHONE_NUMBER_ID = '1157127870810904';
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID || '100013995383645';
 const VERIFY_TOKEN = 'kioskobot2026';
 const MERCADOPAGO_ALIAS = 'fa24encasa';
 const MIN_ORDER = 30000;
