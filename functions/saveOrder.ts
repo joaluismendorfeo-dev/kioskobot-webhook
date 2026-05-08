@@ -1,12 +1,11 @@
 import { base44 } from 'npm:@base44/sdk@0.8.25/functions';
 
-// Endpoint para recibir pedidos del bot de WhatsApp y guardarlos en la entidad Order
-Deno.serve(async (req) => {
+// v2 - forzar redeploy
+Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => ({}));
     const { order, secret } = body;
 
-    // Verificación básica
     if (secret !== 'kioskobot2026') {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -18,7 +17,7 @@ Deno.serve(async (req) => {
       items: typeof order.items === 'string' ? order.items : JSON.stringify(order.items)
     };
 
-    const created = await base44.entities.Order.create(orderToSave);
+    const created = await base44.asServiceRole.entities.Order.create(orderToSave);
     return Response.json({ ok: true, data: created });
 
   } catch (error: any) {
