@@ -1,28 +1,15 @@
-[
-  {
-    "order_number": "068874",
-    "customer_name": "Joaquín Méndez",
-    "customer_phone": "5492236887566",
-    "address": "Chaves 485",
-    "items": [{"id": "combo004", "name": "Combo Bajón Sweet/Salad", "price": 30000, "qty": 1}],
-    "subtotal": 30000,
-    "shipping": 0,
-    "total": 30000,
-    "status": "pending",
-    "payment_method": "mercadopago",
-    "synced_at": "2026-05-08T06:25:37Z"
-  },
-  {
-    "order_number": "677039",
-    "customer_name": "Joaquín Luis Méndez Dorfeo",
-    "customer_phone": "5492236887566",
-    "address": "Chaves 485",
-    "items": [{"id": "combo002", "name": "Combo Maratón Series", "price": 30000, "qty": 1}],
-    "subtotal": 30000,
-    "shipping": 0,
-    "total": 30000,
-    "status": "pending",
-    "payment_method": "mercadopago",
-    "synced_at": "2026-05-08T06:34:00Z"
-  }
-]
+{
+  "last_sync": "2026-05-08T06:39:00.000Z",
+  "synced_orders": [
+    {
+      "order_number": "068874",
+      "customer_name": "Joaquín Méndez",
+      "status": "saved_to_entity"
+    },
+    {
+      "order_number": "677039",
+      "customer_name": "Joaquín Luis Méndez Dorfeo",
+      "status": "pending_save"
+    }
+  ]
+}
